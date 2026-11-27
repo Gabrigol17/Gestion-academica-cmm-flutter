@@ -76,7 +76,7 @@ class _StudentsViewState extends State<_StudentsView> {
     }
   }
 
-  // 3. Confirmar y ELIMINAR estudiante
+  // 3. Confirmar y ELIMINAR estudiante con mensaje amigable de FK
   Future<void> _confirmarEliminar(StudentModel student) async {
     final confirmar = await showDialog<bool>(
       context: context,
@@ -109,10 +109,22 @@ class _StudentsViewState extends State<_StudentsView> {
         ).showSnackBar(const SnackBar(content: Text('Estudiante eliminado')));
       } catch (e) {
         if (!mounted) return;
+        final errorStr = e.toString();
+        final String mensajeError;
+
+        // Si MySQL rechaza por clave foránea (matrícula o acudiente asociado)
+        if (errorStr.contains('500') ||
+            errorStr.toLowerCase().contains('foreign key')) {
+          mensajeError = 'No se puede eliminar a este estudiante porque tiene matrículas o historial académico vinculado.';
+        } else {
+          mensajeError = 'Error al eliminar: $e';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al eliminar: $e'),
+            content: Text(mensajeError),
             backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 4),
           ),
         );
       }

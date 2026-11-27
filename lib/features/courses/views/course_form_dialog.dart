@@ -22,11 +22,12 @@ class _CourseFormDialogState extends State<CourseFormDialog> {
   String _selectedLetra = 'A';
   final int _selectedYearId = 1; // Vigencia activa por defecto (ID 1)
 
-  bool _cargandoGrados = true;
+  bool _cargandoDatos = true;
   bool _guardando = false;
   String? _error;
 
   List<Map<String, dynamic>> _grados = [];
+  List<Map<String, dynamic>> _cursosExistentes = [];
 
   final List<String> _letras = ['A', 'B', 'C', 'D', 'E'];
 
@@ -37,22 +38,26 @@ class _CourseFormDialogState extends State<CourseFormDialog> {
       _selectedGradeId = widget.course!.gradeId;
       _selectedLetra = widget.course!.letra;
     }
-    _cargarGrados();
+    _cargarDatos();
   }
 
-  Future<void> _cargarGrados() async {
+  Future<void> _cargarDatos() async {
     try {
-      final raw = await widget.apiClient.getList('/grados');
+      final gradosRaw = await widget.apiClient.getList('/grados');
+      final cursosRaw = await widget.apiClient.getList('/cursos-vigencia');
       if (!mounted) return;
       setState(() {
-        _grados = raw.whereType<Map<String, dynamic>>().toList();
-        _cargandoGrados = false;
+        _grados = gradosRaw.whereType<Map<String, dynamic>>().toList();
+        _cursosExistentes = cursosRaw
+            .whereType<Map<String, dynamic>>()
+            .toList();
+        _cargandoDatos = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Error al cargar lista de grados: $e';
-        _cargandoGrados = false;
+        _error = 'Error al cargar datos: $e';
+        _cargandoDatos = false;
       });
     }
   }
@@ -62,6 +67,32 @@ class _CourseFormDialogState extends State<CourseFormDialog> {
     if (_selectedGradeId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor selecciona un grado')),
+      );
+      return;
+    }
+
+    // Validación de unicidad: evitar duplicados (mismo Grado + misma Letra)
+    final existeDuplicado = _cursosExistentes.any((c) {
+      final gradId = c['CUR_VIG_GRAD_ID'];
+      final letra = c['CUR_VIG_LETRA']?.toString().trim();
+      final uuid = c['CUR_VIG_UUID']?.toString();
+
+      // Si es edición, ignoramos el mismo registro que estamos editando
+      if (widget.course != null && uuid == widget.course!.uuid) {
+        return false;
+      }
+
+      return gradId == _selectedGradeId && letra == _selectedLetra;
+    });
+
+    if (existeDuplicado) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Ya existe un curso registrado con el Grupo $_selectedLetra para este grado. Selecciona otra letra.',
+          ),
+          backgroundColor: Colors.orange.shade800,
+        ),
       );
       return;
     }
@@ -113,7 +144,7 @@ class _CourseFormDialogState extends State<CourseFormDialog> {
           color: AppTheme.azulOscuro,
         ),
       ),
-      content: _cargandoGrados
+      content: _cargandoDatos
           ? const SizedBox(
               height: 120,
               child: Center(child: CircularProgressIndicator()),
@@ -201,7 +232,7 @@ class _CourseFormDialogState extends State<CourseFormDialog> {
           child: const Text('Cancelar'),
         ),
         FilledButton(
-          onPressed: _guardando || _cargandoGrados ? null : _guardar,
+          onPressed: _guardando || _cargandoDatos ? null : _guardar,
           child: _guardando
               ? const SizedBox(
                   width: 20,
