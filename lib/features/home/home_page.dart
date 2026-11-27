@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../students/views/students_page.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  final ApiClient apiClient;
+
+  const HomePage({super.key, required this.apiClient});
 
   @override
   Widget build(BuildContext context) {
@@ -37,9 +41,15 @@ class HomePage extends StatelessWidget {
                     _ModuleCard(
                       icon: Icons.school_rounded,
                       title: 'Estudiantes',
-                      subtitle: 'Consulta de alumnos matriculados y cursos',
+                      subtitle: 'Consulta de alumnos matriculados y datos',
                       onTap: () {
-                        // Navegaremos al módulo de estudiantes
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                StudentsPage(apiClient: apiClient),
+                          ),
+                        );
                       },
                     ),
                     const SizedBox(height: 14),
@@ -48,7 +58,7 @@ class HomePage extends StatelessWidget {
                       title: 'Profesores',
                       subtitle: 'Directorio y estado de docentes',
                       onTap: () {
-                        // Navegaremos al módulo de profesores
+                        // Conectaremos el módulo de profesores
                       },
                     ),
                     const SizedBox(height: 14),
@@ -57,7 +67,7 @@ class HomePage extends StatelessWidget {
                       title: 'Cursos',
                       subtitle: 'Grados y cursos asignados por vigencia',
                       onTap: () {
-                        // Navegaremos al módulo de cursos
+                        // Conectaremos el módulo de cursos
                       },
                     ),
                   ],

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'app.dart';
+import 'core/api/api_client.dart';
 
 void main() {
-  runApp(const MyApp());
+  final apiClient = ApiClient();
+  runApp(MyApp(apiClient: apiClient));
 }

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
+import 'core/api/api_client.dart';
 import 'core/theme/app_theme.dart';
 import 'features/home/home_page.dart';
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final ApiClient apiClient;
+
+  const MyApp({super.key, required this.apiClient});
 
   @override
   Widget build(BuildContext context) {
@@ -12,7 +15,7 @@ class MyApp extends StatelessWidget {
       title: 'Gestión Académica CMM',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const HomePage(),
+      home: HomePage(apiClient: apiClient),
     );
   }
 }
