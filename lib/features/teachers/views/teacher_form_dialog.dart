@@ -4,11 +4,11 @@ import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/teacher_model.dart';
 
-// Diálogo modal para CREAR o EDITAR un profesor
+// Diálogo modal para VINCULAR o EDITAR un profesor
 class TeacherFormDialog extends StatefulWidget {
   final ApiClient apiClient;
   final TeacherModel?
-  teacher; // Si viene null es CREAR, si tiene datos es EDITAR
+  teacher; // Si viene null es VINCULAR, si tiene datos es EDITAR
 
   const TeacherFormDialog({super.key, required this.apiClient, this.teacher});
 
@@ -20,7 +20,7 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
   final _formKey = GlobalKey<FormState>();
 
   int? _selectedPersonId;
-  int _selectedEstado = 1; // 1 = Activo, 0 = Inactivo
+  int _selectedEstado = 1; // Inicia activo por defecto
 
   bool _cargandoPersonas = true;
   bool _guardando = false;
@@ -45,7 +45,6 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
       final personasRaw = await widget.apiClient.getList('/personas');
       final docentesRaw = await widget.apiClient.getList('/docentes');
 
-      // Obtenemos los IDs de personas que YA son docentes para no duplicar en MySQL
       final idsOcupados = <int>{};
       for (final d in docentesRaw) {
         if (d is Map<String, dynamic> && d['DOC_PER_ID'] != null) {
@@ -88,10 +87,8 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
 
     try {
       if (widget.teacher == null) {
-        // CREAR (POST)
         await widget.apiClient.post('/docentes', payload);
       } else {
-        // ACTUALIZAR (PUT por UUID)
         await widget.apiClient.put(
           '/docentes/${widget.teacher!.uuid}',
           payload,
@@ -118,7 +115,7 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
 
     return AlertDialog(
       title: Text(
-        esEdicion ? 'Editar Profesor' : 'Nuevo Profesor',
+        esEdicion ? 'Actualizar Estado de Docente' : 'Vincular Docente',
         style: const TextStyle(
           fontWeight: FontWeight.bold,
           color: AppTheme.azulOscuro,
@@ -138,12 +135,20 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (esEdicion) ...[
+                    if (!esEdicion) ...[
                       const Text(
-                        'Docente:',
-                        style: TextStyle(fontWeight: FontWeight.w600),
+                        'Selecciona una persona registrada para asignarle el rol de docente:',
+                        style: TextStyle(fontSize: 13, color: Colors.black54),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 14),
+                    ],
+                    const Text(
+                      'Persona:',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 6),
+
+                    if (esEdicion)
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(
@@ -162,37 +167,45 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
                             color: Colors.black87,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                    ] else ...[
-                      const Text(
-                        'Persona:',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 6),
+                      )
+                    else
                       _personas.isEmpty
-                          ? const Text(
-                              'No hay personas disponibles sin asignar.',
-                              style: TextStyle(
-                                color: Colors.orange,
-                                fontSize: 13,
+                          ? Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.amber.shade300,
+                                ),
+                              ),
+                              child: const Text(
+                                'Todas las personas registradas ya tienen un rol asignado.',
+                                style: TextStyle(
+                                  color: Colors.black87,
+                                  fontSize: 13,
+                                ),
                               ),
                             )
                           : DropdownButtonFormField<int>(
                               value: _selectedPersonId,
                               isExpanded: true,
-                              hint: const Text('Seleccionar persona...'),
+                              hint: const Text(
+                                'Buscar y seleccionar persona...',
+                              ),
                               items: _personas.map((p) {
                                 final nombre = [
                                   p['PER_PRIMER_NOMBRE'],
                                   p['PER_PRIMER_APELLIDO'],
                                 ].whereType<String>().join(' ');
+                                final doc = p['PER_NUMERO_DOCUMENTO'] ?? '';
                                 final id = p['PER_ID'] as int?;
+                                final etiqueta = doc.toString().isNotEmpty
+                                    ? '$nombre (Doc: $doc)'
+                                    : nombre;
                                 return DropdownMenuItem<int>(
                                   value: id,
-                                  child: Text(
-                                    nombre.isEmpty ? 'Persona #$id' : nombre,
-                                  ),
+                                  child: Text(etiqueta),
                                 );
                               }).toList(),
                               onChanged: (val) {
@@ -210,34 +223,54 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
                                 ),
                               ),
                             ),
-                      const SizedBox(height: 16),
-                    ],
+                    const SizedBox(height: 16),
 
-                    // Selector de Estado (Activo / Inactivo)
-                    const Text(
-                      'Estado:',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<int>(
-                      value: _selectedEstado,
-                      items: const [
-                        DropdownMenuItem(value: 1, child: Text('Activo')),
-                        DropdownMenuItem(value: 0, child: Text('Inactivo')),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) setState(() => _selectedEstado = val);
-                      },
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
+                    if (esEdicion) ...[
+                      const Text(
+                        'Estado:',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 6),
+                      DropdownButtonFormField<int>(
+                        value: _selectedEstado,
+                        items: const [
+                          DropdownMenuItem(value: 1, child: Text('Activo')),
+                          DropdownMenuItem(value: 0, child: Text('Inactivo')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null)
+                            setState(() => _selectedEstado = val);
+                        },
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
                         ),
                       ),
-                    ),
+                    ] else ...[
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.check_circle_outline,
+                            size: 18,
+                            color: Colors.green.shade700,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Iniciará con estado: Activo',
+                            style: TextStyle(
+                              color: Colors.green.shade800,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -248,7 +281,12 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
           child: const Text('Cancelar'),
         ),
         FilledButton(
-          onPressed: _guardando || _cargandoPersonas ? null : _guardar,
+          onPressed:
+              _guardando ||
+                  _cargandoPersonas ||
+                  (!esEdicion && _personas.isEmpty)
+              ? null
+              : _guardar,
           child: _guardando
               ? const SizedBox(
                   width: 20,
@@ -258,7 +296,7 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
                     strokeWidth: 2,
                   ),
                 )
-              : Text(esEdicion ? 'Actualizar' : 'Crear'),
+              : Text(esEdicion ? 'Actualizar' : 'Vincular'),
         ),
       ],
     );
