@@ -8,7 +8,7 @@ import '../models/student_model.dart';
 class StudentFormDialog extends StatefulWidget {
   final ApiClient apiClient;
   final StudentModel?
-  student; // Si viene null es CREAR, si viene con datos es EDITAR
+  student; // Si viene null es CREAR, si tiene datos es EDITAR
 
   const StudentFormDialog({super.key, required this.apiClient, this.student});
 
@@ -31,21 +31,37 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
   @override
   void initState() {
     super.initState();
-    // Si estamos editando, precargamos los valores actuales
+    // Si estamos editando, conservamos su personId original
     if (widget.student != null) {
       _selectedPersonId = widget.student!.personId;
       _selectedEstado = widget.student!.estado == 'Activo' ? 1 : 0;
+      _cargandoPersonas = false; // No necesitamos cargar la lista de personas si solo editamos el rol
+    } else {
+      _cargarPersonas();
     }
-    _cargarPersonas();
   }
 
-  // Obtenemos la lista de personas para poblar el Dropdown
+  // Obtenemos la lista de personas disponibles para CREAR
   Future<void> _cargarPersonas() async {
     try {
-      final raw = await widget.apiClient.getList('/personas');
+      final personasRaw = await widget.apiClient.getList('/personas');
+      final estudiantesRaw = await widget.apiClient.getList('/estudiantes');
+
+      // Obtenemos los IDs de personas que YA son estudiantes para no duplicar en MySQL
+      final idsOcupados = <int>{};
+      for (final e in estudiantesRaw) {
+        if (e is Map<String, dynamic> && e['EST_PER_ID'] != null) {
+          idsOcupados.add(e['EST_PER_ID'] as int);
+        }
+      }
+
       if (!mounted) return;
       setState(() {
-        _personas = raw.whereType<Map<String, dynamic>>().toList();
+        // Solo mostramos personas disponibles que aún no sean estudiantes
+        _personas = personasRaw
+            .whereType<Map<String, dynamic>>()
+            .where((p) => !idsOcupados.contains(p['PER_ID']))
+            .toList();
         _cargandoPersonas = false;
       });
     } catch (e) {
@@ -79,7 +95,7 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
         // CREAR (POST)
         await widget.apiClient.post('/estudiantes', payload);
       } else {
-        // ACTUALIZAR (PUT por UUID)
+        // ACTUALIZAR (PUT por UUID manteniendo la persona fija)
         await widget.apiClient.put(
           '/estudiantes/${widget.student!.uuid}',
           payload,
@@ -87,13 +103,10 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
       }
 
       if (!mounted) return;
-      Navigator.of(context)
-          .pop(true); // Retorna true para indicar que hubo éxito
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _guardando = false;
-      });
+      setState(() => _guardando = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al guardar: $e'),
@@ -129,52 +142,91 @@ class _StudentFormDialogState extends State<StudentFormDialog> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Selector de Persona
-                    const Text(
-                      'Persona:',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<int>(
-                      initialValue: _selectedPersonId,
-                      isExpanded: true,
-                      hint: const Text('Seleccionar persona...'),
-                      items: _personas.map((p) {
-                        final nombre = [
-                          p['PER_PRIMER_NOMBRE'],
-                          p['PER_PRIMER_APELLIDO'],
-                        ].whereType<String>().join(' ');
-                        final id = p['PER_ID'] as int?;
-                        return DropdownMenuItem<int>(
-                          value: id,
-                          child: Text(nombre.isEmpty ? 'Persona #$id' : nombre),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        setState(() => _selectedPersonId = val);
-                      },
-                      validator: (val) =>
-                          val == null ? 'Selecciona una persona' : null,
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
+                    // Si es edición: Mostramos la persona fija (solo lectura)
+                    if (esEdicion) ...[
+                      const Text(
+                        'Estudiante:',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
                           horizontal: 12,
-                          vertical: 10,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppTheme.bordeGris),
+                        ),
+                        child: Text(
+                          widget.student!.nombreCompleto,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 16),
+                    ] else ...[
+                      // Si es creación: Selector de personas disponibles
+                      const Text(
+                        'Persona:',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 6),
+                      _personas.isEmpty
+                          ? const Text(
+                              'No hay personas disponibles sin asignar.',
+                              style: TextStyle(
+                                color: Colors.orange,
+                                fontSize: 13,
+                              ),
+                            )
+                          : DropdownButtonFormField<int>(
+                              value: _selectedPersonId,
+                              isExpanded: true,
+                              hint: const Text('Seleccionar persona...'),
+                              items: _personas.map((p) {
+                                final nombre = [
+                                  p['PER_PRIMER_NOMBRE'],
+                                  p['PER_PRIMER_APELLIDO'],
+                                ].whereType<String>().join(' ');
+                                final id = p['PER_ID'] as int?;
+                                return DropdownMenuItem<int>(
+                                  value: id,
+                                  child: Text(
+                                    nombre.isEmpty ? 'Persona #$id' : nombre,
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                setState(() => _selectedPersonId = val);
+                              },
+                              validator: (val) =>
+                                  val == null ? 'Selecciona una persona' : null,
+                              decoration: InputDecoration(
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
+                                ),
+                              ),
+                            ),
+                      const SizedBox(height: 16),
+                    ],
 
-                    // Selector de Estado Institucional
+                    // Selector de Estado Institucional (Activo / Inactivo)
                     const Text(
                       'Estado Institucional:',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<int>(
-                      initialValue: _selectedEstado,
+                      value: _selectedEstado,
                       items: const [
                         DropdownMenuItem(value: 1, child: Text('Activo')),
                         DropdownMenuItem(value: 0, child: Text('Inactivo')),

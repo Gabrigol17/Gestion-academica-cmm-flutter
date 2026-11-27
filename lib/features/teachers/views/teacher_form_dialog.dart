@@ -34,16 +34,31 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
     if (widget.teacher != null) {
       _selectedPersonId = widget.teacher!.personId;
       _selectedEstado = widget.teacher!.estado == 'Activo' ? 1 : 0;
+      _cargandoPersonas = false;
+    } else {
+      _cargarPersonas();
     }
-    _cargarPersonas();
   }
 
   Future<void> _cargarPersonas() async {
     try {
-      final raw = await widget.apiClient.getList('/personas');
+      final personasRaw = await widget.apiClient.getList('/personas');
+      final docentesRaw = await widget.apiClient.getList('/docentes');
+
+      // Obtenemos los IDs de personas que YA son docentes para no duplicar en MySQL
+      final idsOcupados = <int>{};
+      for (final d in docentesRaw) {
+        if (d is Map<String, dynamic> && d['DOC_PER_ID'] != null) {
+          idsOcupados.add(d['DOC_PER_ID'] as int);
+        }
+      }
+
       if (!mounted) return;
       setState(() {
-        _personas = raw.whereType<Map<String, dynamic>>().toList();
+        _personas = personasRaw
+            .whereType<Map<String, dynamic>>()
+            .where((p) => !idsOcupados.contains(p['PER_ID']))
+            .toList();
         _cargandoPersonas = false;
       });
     } catch (e) {
@@ -66,7 +81,6 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
 
     setState(() => _guardando = true);
 
-    // Campos requeridos por Flask para DOCENTES: DOC_PER_ID y DOC_ESTADO
     final payload = {
       'DOC_PER_ID': _selectedPersonId,
       'DOC_ESTADO': _selectedEstado,
@@ -124,52 +138,89 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Selector de Persona
-                    const Text(
-                      'Persona:',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<int>(
-                      initialValue: _selectedPersonId,
-                      isExpanded: true,
-                      hint: const Text('Seleccionar persona...'),
-                      items: _personas.map((p) {
-                        final nombre = [
-                          p['PER_PRIMER_NOMBRE'],
-                          p['PER_PRIMER_APELLIDO'],
-                        ].whereType<String>().join(' ');
-                        final id = p['PER_ID'] as int?;
-                        return DropdownMenuItem<int>(
-                          value: id,
-                          child: Text(nombre.isEmpty ? 'Persona #$id' : nombre),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        setState(() => _selectedPersonId = val);
-                      },
-                      validator: (val) =>
-                          val == null ? 'Selecciona una persona' : null,
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
+                    if (esEdicion) ...[
+                      const Text(
+                        'Docente:',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
                           horizontal: 12,
-                          vertical: 10,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppTheme.bordeGris),
+                        ),
+                        child: Text(
+                          widget.teacher!.nombreCompleto,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 16),
+                    ] else ...[
+                      const Text(
+                        'Persona:',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 6),
+                      _personas.isEmpty
+                          ? const Text(
+                              'No hay personas disponibles sin asignar.',
+                              style: TextStyle(
+                                color: Colors.orange,
+                                fontSize: 13,
+                              ),
+                            )
+                          : DropdownButtonFormField<int>(
+                              value: _selectedPersonId,
+                              isExpanded: true,
+                              hint: const Text('Seleccionar persona...'),
+                              items: _personas.map((p) {
+                                final nombre = [
+                                  p['PER_PRIMER_NOMBRE'],
+                                  p['PER_PRIMER_APELLIDO'],
+                                ].whereType<String>().join(' ');
+                                final id = p['PER_ID'] as int?;
+                                return DropdownMenuItem<int>(
+                                  value: id,
+                                  child: Text(
+                                    nombre.isEmpty ? 'Persona #$id' : nombre,
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                setState(() => _selectedPersonId = val);
+                              },
+                              validator: (val) =>
+                                  val == null ? 'Selecciona una persona' : null,
+                              decoration: InputDecoration(
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
+                                ),
+                              ),
+                            ),
+                      const SizedBox(height: 16),
+                    ],
 
-                    // Selector de Estado
+                    // Selector de Estado (Activo / Inactivo)
                     const Text(
                       'Estado:',
                       style: TextStyle(fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<int>(
-                      initialValue: _selectedEstado,
+                      value: _selectedEstado,
                       items: const [
                         DropdownMenuItem(value: 1, child: Text('Activo')),
                         DropdownMenuItem(value: 0, child: Text('Inactivo')),
