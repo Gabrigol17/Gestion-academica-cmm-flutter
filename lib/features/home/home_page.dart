@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../students/views/students_page.dart';
+import '../teachers/views/teachers_page.dart';
 
 class HomePage extends StatelessWidget {
   final ApiClient apiClient;
@@ -56,9 +57,15 @@ class HomePage extends StatelessWidget {
                     _ModuleCard(
                       icon: Icons.person_rounded,
                       title: 'Profesores',
-                      subtitle: 'Directorio y estado de docentes',
+                      subtitle: 'Directorio y gestión de docentes',
                       onTap: () {
-                        // Conectaremos el módulo de profesores
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                TeachersPage(apiClient: apiClient),
+                          ),
+                        );
                       },
                     ),
                     const SizedBox(height: 14),
