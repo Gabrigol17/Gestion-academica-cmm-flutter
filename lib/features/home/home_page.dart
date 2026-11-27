@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/theme/app_theme.dart';
+import '../courses/views/courses_page.dart';
 import '../students/views/students_page.dart';
 import '../teachers/views/teachers_page.dart';
 
@@ -74,7 +75,13 @@ class HomePage extends StatelessWidget {
                       title: 'Cursos',
                       subtitle: 'Grados y cursos asignados por vigencia',
                       onTap: () {
-                        // Conectaremos el módulo de cursos
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                CoursesPage(apiClient: apiClient),
+                          ),
+                        );
                       },
                     ),
                   ],
