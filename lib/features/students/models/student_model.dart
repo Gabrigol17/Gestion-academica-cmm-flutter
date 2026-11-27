@@ -1,5 +1,7 @@
 class StudentModel {
   final int id;
+  final String uuid;
+  final int personId;
   final String nombreCompleto;
   final String documento;
   final String correo;
@@ -7,6 +9,8 @@ class StudentModel {
 
   StudentModel({
     required this.id,
+    required this.uuid,
+    required this.personId,
     required this.nombreCompleto,
     required this.documento,
     required this.correo,
@@ -47,6 +51,8 @@ class StudentModel {
 
     return StudentModel(
       id: estudiante['EST_ID'] ?? 0,
+      uuid: estudiante['EST_UUID']?.toString() ?? '',
+      personId: estudiante['EST_PER_ID'] ?? 0,
       nombreCompleto: nombre,
       documento: doc,
       correo: email,
