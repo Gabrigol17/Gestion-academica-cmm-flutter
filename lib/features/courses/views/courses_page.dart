@@ -214,7 +214,7 @@ class _CoursesViewState extends State<_CoursesView> {
                       : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
                           itemCount: cursosFiltrados.length,
-                          separatorBuilder: (_, __) =>
+                          separatorBuilder: (_, _) =>
                               const SizedBox(height: 10),
                           itemBuilder: (context, index) {
                             final curso = cursosFiltrados[index];

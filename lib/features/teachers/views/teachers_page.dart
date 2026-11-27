@@ -217,7 +217,7 @@ class _TeachersViewState extends State<_TeachersView> {
                       : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
                           itemCount: profesoresFiltrados.length,
-                          separatorBuilder: (_, __) =>
+                          separatorBuilder: (_, _) =>
                               const SizedBox(height: 10),
                           itemBuilder: (context, index) {
                             final profe = profesoresFiltrados[index];
