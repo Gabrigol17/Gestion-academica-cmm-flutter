@@ -3,8 +3,14 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiClient {
-  // Dirección donde corre tu backend Flask en local (puerto 3000)
-  final String baseUrl = 'http://127.0.0.1:3000';
+  // Dirección donde corre tu backend Flask.
+  // Por defecto usa http://10.0.2.2:3000 (la IP especial de Android Emulator para conectarse a tu PC).
+  // Si corres en Linux Desktop usa http://127.0.0.1:3000.
+  // También se puede sobreescribir con --dart-define=API_BASE_URL=...
+  final String baseUrl = const String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://10.0.2.2:3000',
+  );
 
   // Cabeceras estándar para enviar y recibir JSON
   Map<String, String> get _headers => {
@@ -35,7 +41,7 @@ class ApiClient {
         );
       }
     } catch (e) {
-      throw Exception('Error al conectar con la API: $e');
+      throw Exception('Error al conectar con la API ($baseUrl): $e');
     }
   }
 
